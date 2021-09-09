@@ -1,4 +1,7 @@
 use std::fmt;
+use std::cell::Cell;
+
+thread_local!(static ENTERED: Cell<bool>) = Cell::new(false));
 
 pub struct Enter {
     _priv: (),
@@ -22,3 +25,31 @@ impl fmt::Display for EnterError {
 }
 
 impl std::error::Error for EnterError {}
+
+pub fn enter() -> Result<Enter, EnterError> {
+    // thread::LocalKey
+    Entered.with(|c| {
+        if c.get() {
+            Err(EnterError { _priv: () })
+        } else {
+            c.set(true);
+
+            Ok(Enter { _priv: () })
+        }
+    })
+}
+
+impl fmt::Debug for Enter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Enter").finish()
+    }
+}
+
+impl Drop for Enter {
+    fn drop(&mut self) {
+        ENTERED.with(|c| {
+            assert!(c.get());
+            c.set(false);
+        });
+    }
+}
